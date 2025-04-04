@@ -1,5 +1,7 @@
 # @andreasnicolaou/query-builder
 
+DEMO: https://stackblitz.com/edit/vitejs-vite-grxpgw5w
+
 ![GitHub package.json version](https://img.shields.io/github/package-json/v/andreasnicolaou/query-builder)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/andreasnicolaou/query-builder/build.yaml)
 ![GitHub License](https://img.shields.io/github/license/andreasnicolaou/query-builder)
