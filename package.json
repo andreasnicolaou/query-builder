@@ -1,6 +1,6 @@
 {
   "name": "@andreasnicolaou/query-builder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A flexible and type-safe query builder for constructing complex conditional expressions with support for nested groups, various operators, and function calls.",
   "main": "dist/index.js",
   "private": false,
