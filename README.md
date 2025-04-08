@@ -10,6 +10,8 @@ DEMO: https://stackblitz.com/edit/vitejs-vite-grxpgw5w
 
 A flexible, type-safe query builder for constructing complex conditional expressions with support for nested groups, various operators, and function calls.
 
+> **Note:** This is _not_ an ORM and does **not** execute queries or connect to any database. It's a serialization and expression-building utility, ideal for building advanced search/filter UIs, custom DSLs, or backend query engines.
+
 ## Features
 
 - Chainable builder API
