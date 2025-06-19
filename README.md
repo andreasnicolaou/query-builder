@@ -43,12 +43,28 @@ const query = new QueryBuilder()
 console.log(query); // name == 'Andreas' or age >= 18 and (status in ('active', 'pending') and created > '2025-01-01T00:00:00.000Z')
 ```
 
+## Skipping Empty or Invalid Values
+
+```typescript
+import { QueryBuilder } from '@andreasnicolaou/query-builder';
+
+const query = new QueryBuilder()
+  .skipWhen({ emptyString: true, emptyArray: true })
+  .where('name', '===', '')
+  .where('age', '>', 36)
+  .where('tags', 'in', [])
+  .toString();
+
+console.log(query); // age > 36
+```
+
 ## API Highlights
 
 ### Core Methods
 
 - `.where(field, operator, value?, logicalOperator?)` - Add a condition
 - `.group(callback, logicalOperator?)` - Create nested conditions
+- `.skipWhen(options?)` – Configure automatic value skipping (`null`, `undefined`, `''`, `[]`, `NaN` are skipped by default; empty objects are not)
 - `.toJSON()` - Get serializable representation
 - `.toString()` - Get human-readable string
 

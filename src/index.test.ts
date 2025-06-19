@@ -157,4 +157,90 @@ describe('QueryBuilder', () => {
       expect(qb.toString()).toBe("age > 18 and role = 'admin' or active = true");
     });
   });
+
+  describe('Skip Values', () => {
+    test('should skip condition with empty string when configured', () => {
+      qb.skipWhen({ emptyString: true }).where('name', '===', '');
+      expect(qb.toJSON()).toEqual([]);
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should skip condition with undefined when configured', () => {
+      qb.skipWhen({ undefined: true }).where('name', '===', undefined);
+      expect(qb.toJSON()).toEqual([]);
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should skip condition with null when configured', () => {
+      qb.skipWhen({ null: true }).where('name', '===', null);
+      expect(qb.toJSON()).toEqual([]);
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should skip condition with empty array when configured', () => {
+      qb.skipWhen({ emptyArray: true }).where('tags', 'in', []);
+      expect(qb.toJSON()).toEqual([]);
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should skip arrays with empty values', () => {
+      qb.skipWhen({ emptyArray: true }).where('tags', 'in', ['', null, undefined]);
+      expect(qb.toJSON()).toEqual([]);
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should include non-empty values and skip configured ones', () => {
+      qb.skipWhen({ emptyString: true, emptyArray: true })
+        .where('name', '===', '')
+        .where('age', '>', 30)
+        .where('role', 'in', [])
+        .where('status', '=', 'active');
+
+      expect(qb.toString()).toBe("age > 30 and status = 'active'");
+    });
+
+    test('should handle nested groups with only skipped conditions', () => {
+      qb.skipWhen({ emptyString: true, emptyArray: true }).group((q) => {
+        q.where('name', '=', '');
+        q.where('role', 'in', []);
+      });
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should include nested groups with at least one non-skipped condition', () => {
+      qb.skipWhen({ emptyString: true, emptyArray: true }).group((q) => {
+        q.where('name', '=', '');
+        q.where('role', 'in', ['admin']);
+      });
+      expect(qb.toString()).toBe("(role in ('admin'))");
+    });
+
+    test('should skip empty groups by default', () => {
+      qb.group(() => {
+        // Empty group
+      });
+      expect(qb.toString()).toBe('');
+    });
+
+    test('should allow selective skipping of values', () => {
+      qb.skipWhen({ null: true, emptyString: true, undefined: false })
+        .where('name', '==', 'John') // Included
+        .where('middle', '==', '') // Skipped
+        .where('last', '==', null) // Skipped
+        .where('age', '>', 30) // Included
+        .where('deleted', '==', undefined); // Included (since undefined skipping is false by default)
+
+      expect(qb.toString()).toBe("name == 'John' and age > 30 and deleted == undefined");
+    });
+
+    test('should skip NaN values when configured', () => {
+      qb.skipWhen({ nan: true }).where('score', '>', NaN).where('rating', '<', 5);
+      expect(qb.toString()).toBe('rating < 5');
+    });
+
+    test('should skip empty objects when configured', () => {
+      qb.skipWhen({ emptyObject: true }).where('config', '=', {}).where('settings', '=', { darkMode: true });
+      expect(qb.toString()).toBe('settings = {"darkMode":true}');
+    });
+  });
 });
