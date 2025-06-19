@@ -6,7 +6,7 @@ export type ComparisonOperator = '===' | '!==' | '==' | '=' | '!=' | '>=' | '<='
 // Complete set of all possible operators
 export type Operators = WordOperator | SetOperator | LogicalOperator | ComparisonOperator;
 
-export type PrimitiveValue = string | number | boolean | FunctionCall | null;
+export type PrimitiveValue = string | number | boolean | FunctionCall | null | object;
 export type RawValueArray = (PrimitiveValue | FunctionCall)[] | RawValueArray[];
 export type RawValue = PrimitiveValue | RawValueArray;
 
@@ -20,11 +20,18 @@ export type QueryBuilderSerialized = (LogicalOperator | Condition | { group: Que
 export interface Condition {
   field: string;
   operator: Operators;
-  value?: Value;
+  value?: RawValue;
   negated?: boolean;
 }
 
-export type Value = RawValue | FunctionCall | QueryBuilderSerialized;
+export interface SkipWhenOptions {
+  null?: boolean;
+  undefined?: boolean;
+  emptyString?: boolean;
+  emptyArray?: boolean;
+  nan?: boolean;
+  emptyObject?: boolean;
+}
 
 /**
  * Query builder for constructing complex conditional expressions.
@@ -33,7 +40,8 @@ export type Value = RawValue | FunctionCall | QueryBuilderSerialized;
  */
 
 export class QueryBuilder {
-  private conditions: QueryBuilderSerialized = [];
+  private readonly conditions: QueryBuilderSerialized = [];
+  private skipOptions!: SkipWhenOptions;
 
   /**
    * Creates a function call object that can be used as a value in conditions.
@@ -54,7 +62,7 @@ export class QueryBuilder {
    * @memberof QueryBuilder
    */
   public group(callback: (qb: QueryBuilder) => void, logicalOperator: LogicalOperator = 'and'): this {
-    const nested = new QueryBuilder();
+    const nested = new QueryBuilder().skipWhen(this.skipOptions);
     callback(nested);
     const nestedConditions = nested.toJSON();
     if (nestedConditions.length > 0) {
@@ -63,6 +71,25 @@ export class QueryBuilder {
       }
       this.conditions.push({ group: nestedConditions });
     }
+    return this;
+  }
+
+  /**
+   * Configures which values should be skipped when adding conditions.
+   * @param options Configuration for value skipping behavior
+   * @returns The query builder instance for chaining
+   * @memberof QueryBuilder
+   */
+  public skipWhen(options?: SkipWhenOptions): this {
+    this.skipOptions = {
+      null: true,
+      undefined: true,
+      emptyString: true,
+      emptyArray: true,
+      nan: true,
+      emptyObject: false,
+      ...options,
+    };
     return this;
   }
 
@@ -85,7 +112,7 @@ export class QueryBuilder {
   }
 
   /**
-   *Adds a condition to the query builder.
+   * Adds a condition to the query builder.
    * @param field The field/column to compare
    * @param operator The comparison operator to use
    * @param value The value to compare against (optional for some operators)
@@ -93,7 +120,11 @@ export class QueryBuilder {
    * @returns The query builder instance for chaining
    * @memberof QueryBuilder
    */
-  public where(field: string, operator: Operators, value?: Value, logicalOperator: LogicalOperator = 'and'): this {
+  public where(field: string, operator: Operators, value?: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    if (this.shouldSkipValue(value)) {
+      return this;
+    }
+
     if (this.conditions.length > 0) {
       this.conditions.push(logicalOperator); // Insert logical operator between conditions
     }
@@ -139,6 +170,8 @@ export class QueryBuilder {
           } else {
             conditionStr += ` ${this.valueToString(cond.value)}`;
           }
+        } else {
+          conditionStr += ` undefined`;
         }
 
         result.push(conditionStr);
@@ -161,6 +194,56 @@ export class QueryBuilder {
     return (
       Array.isArray(value) && value.some((item) => typeof item === 'object' && item !== null && 'operator' in item)
     );
+  }
+
+  /**
+   * Checks if a value should be skipped based on current skip options
+   * @param value The value to check
+   * @returns True if the value should be skipped
+   * @memberof QueryBuilder
+   */
+  private shouldSkipValue(value: RawValue | undefined): boolean {
+    if (!this.skipOptions) return false;
+
+    if (value === null && this.skipOptions.null !== false) {
+      return true;
+    }
+
+    if (value === undefined && this.skipOptions.undefined !== false) {
+      return true;
+    }
+
+    if (typeof value === 'string' && value === '' && this.skipOptions.emptyString !== false) {
+      return true;
+    }
+
+    if (Array.isArray(value) && this.skipOptions.emptyArray !== false) {
+      if (
+        value.length === 0 ||
+        value.every(
+          (item) => item === null || item === undefined || item === '' || (typeof item === 'number' && isNaN(item))
+        )
+      ) {
+        return true;
+      }
+    }
+
+    if (typeof value === 'number' && isNaN(value) && this.skipOptions.nan !== false) {
+      return true;
+    }
+
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      !('$fn' in value) && // Don't skip FunctionCall objects
+      Object.keys(value).length === 0 &&
+      this.skipOptions.emptyObject
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
