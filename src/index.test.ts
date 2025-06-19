@@ -183,7 +183,7 @@ describe('QueryBuilder', () => {
       expect(qb.toString()).toBe('');
     });
 
-    test('should skip arrays with empty values', () => {
+    test('should skip condition with nullable array values when configured', () => {
       qb.skipWhen({ emptyArray: true }).where('tags', 'in', ['', null, undefined]);
       expect(qb.toJSON()).toEqual([]);
       expect(qb.toString()).toBe('');
@@ -224,12 +224,11 @@ describe('QueryBuilder', () => {
 
     test('should allow selective skipping of values', () => {
       qb.skipWhen({ null: true, emptyString: true, undefined: false })
-        .where('name', '==', 'John') // Included
-        .where('middle', '==', '') // Skipped
-        .where('last', '==', null) // Skipped
-        .where('age', '>', 30) // Included
-        .where('deleted', '==', undefined); // Included (since undefined skipping is false by default)
-
+        .where('name', '==', 'John')
+        .where('middle', '==', '')
+        .where('last', '==', null)
+        .where('age', '>', 30)
+        .where('deleted', '==', undefined);
       expect(qb.toString()).toBe("name == 'John' and age > 30 and deleted == undefined");
     });
 
