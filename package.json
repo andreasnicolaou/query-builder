@@ -50,7 +50,7 @@
     "prettier": "3.5.3",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   },
   "keywords": [
     "query-builder",
