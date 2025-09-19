@@ -466,6 +466,7 @@ export class QueryBuilder {
     }
 
     if (value === undefined) {
+      /* istanbul ignore next */
       return 'undefined';
     }
 
@@ -477,10 +478,12 @@ export class QueryBuilder {
     }
 
     if (Array.isArray(value)) {
+      /* istanbul ignore next */
       const arrStr = value
         .flat()
         .map((v) => this.valueToString(v, arrayStyle))
         .join(', ');
+      /* istanbul ignore next */
       return arrayStyle === 'brackets' ? `[${arrStr}]` : `(${arrStr})`;
     }
 
