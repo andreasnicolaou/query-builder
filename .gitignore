@@ -13,4 +13,5 @@ npm-debug.log
 # Logs
 logs
 *.log
+/coverage
 

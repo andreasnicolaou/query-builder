@@ -1,10 +1,19 @@
-export type WordOperator = 'starts with' | 'ends with' | 'contains' | 'matches';
+export type WordOperator = 'starts with' | 'ends with' | 'contains' | 'matches' | 'like' | 'ilike';
 export type SetOperator = 'not in' | 'in';
 export type LogicalOperator = 'and' | 'or';
 export type ComparisonOperator = '===' | '!==' | '==' | '=' | '!=' | '>=' | '<=' | '<' | '>';
+export type RangeOperator = 'between' | 'not between';
+export type NullOperator = 'is null' | 'is not null' | 'is empty' | 'is not empty';
+export type ArrayStyle = 'parens' | 'brackets';
 
 // Complete set of all possible operators
-export type Operators = WordOperator | SetOperator | LogicalOperator | ComparisonOperator;
+export type Operators =
+  | WordOperator
+  | SetOperator
+  | LogicalOperator
+  | ComparisonOperator
+  | RangeOperator
+  | NullOperator;
 
 export type PrimitiveValue = string | number | boolean | FunctionCall | null | object;
 export type RawValueArray = (PrimitiveValue | FunctionCall)[] | RawValueArray[];
@@ -21,7 +30,6 @@ export interface Condition {
   field: string;
   operator: Operators;
   value?: RawValue;
-  negated?: boolean;
 }
 
 export interface SkipWhenOptions {
@@ -41,7 +49,14 @@ export interface SkipWhenOptions {
 
 export class QueryBuilder {
   private readonly conditions: QueryBuilderSerialized = [];
-  private skipOptions!: SkipWhenOptions;
+  private skipOptions: SkipWhenOptions = {
+    null: true,
+    undefined: true,
+    emptyString: true,
+    emptyArray: true,
+    nan: true,
+    emptyObject: true,
+  };
 
   /**
    * Creates a function call object that can be used as a value in conditions.
@@ -52,6 +67,68 @@ export class QueryBuilder {
    */
   public static fn(name: string, ...args: (PrimitiveValue | RawValueArray)[]): FunctionCall {
     return { $fn: name, args };
+  }
+
+  /**
+   * Validates if an operator is compatible with a value type
+   * @param operator The operator to validate
+   * @param value The value to validate against
+   * @returns Validation result with error message if invalid
+   * @memberof QueryBuilder
+   */
+  public static validateOperator(operator: Operators, value?: RawValue): { valid: boolean; error?: string } {
+    const nullOps: NullOperator[] = ['is null', 'is not null', 'is empty', 'is not empty'];
+    const rangeOps: RangeOperator[] = ['between', 'not between'];
+    const setOps: SetOperator[] = ['in', 'not in'];
+
+    // Null operators shouldn't have values
+    if (nullOps.includes(operator as NullOperator) && value !== undefined) {
+      return { valid: false, error: `Operator '${operator}' should not have a value` };
+    }
+
+    // Range operators need arrays with 2 elements
+    if (rangeOps.includes(operator as RangeOperator)) {
+      if (!Array.isArray(value) || value.length !== 2) {
+        return { valid: false, error: `Operator '${operator}' requires an array with exactly 2 values` };
+      }
+    }
+
+    // Set operators need arrays
+    if (setOps.includes(operator as SetOperator)) {
+      if (!Array.isArray(value)) {
+        return { valid: false, error: `Operator '${operator}' requires an array value` };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Adds a BETWEEN condition.
+   */
+  public between(field: string, range: [RawValue, RawValue], logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'between', range, logicalOperator);
+  }
+
+  /**
+   * Adds an equals (=) condition.
+   */
+  public equals(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '=', value, logicalOperator);
+  }
+
+  /**
+   * Adds a greater than (>) condition.
+   */
+  public greaterThan(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '>', value, logicalOperator);
+  }
+
+  /**
+   * Adds a greater than or equal (>=) condition.
+   */
+  public greaterThanOrEqual(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '>=', value, logicalOperator);
   }
 
   /**
@@ -75,6 +152,97 @@ export class QueryBuilder {
   }
 
   /**
+   * Adds an ILIKE (case-insensitive like) condition.
+   */
+  public ilike(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'ilike', value, logicalOperator);
+  }
+
+  /**
+   * Adds an IN condition.
+   */
+  public in(field: string, values: RawValueArray, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'in', values, logicalOperator);
+  }
+
+  /**
+   * Adds an IS EMPTY condition.
+   */
+  public isEmpty(field: string, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'is empty', undefined, logicalOperator);
+  }
+
+  /**
+   * Adds an IS NOT EMPTY condition.
+   */
+  public isNotEmpty(field: string, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'is not empty', undefined, logicalOperator);
+  }
+
+  /**
+   * Adds an IS NOT NULL condition.
+   */
+  public isNotNull(field: string, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'is not null', undefined, logicalOperator);
+  }
+
+  /**
+   * Adds an IS NULL condition.
+   */
+  public isNull(field: string, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'is null', undefined, logicalOperator);
+  }
+
+  /**
+   * Adds a less than (<) condition.
+   */
+  public lessThan(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '<', value, logicalOperator);
+  }
+
+  /**
+   * Adds a less than or equal (<=) condition.
+   */
+  public lessThanOrEqual(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '<=', value, logicalOperator);
+  }
+
+  /**
+   * Adds a LIKE condition.
+   */
+  public like(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'like', value, logicalOperator);
+  }
+
+  /**
+   * Adds a loose equals (==) condition.
+   */
+  public looseEquals(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '==', value, logicalOperator);
+  }
+
+  /**
+   * Adds a NOT BETWEEN condition.
+   */
+  public notBetween(field: string, range: [RawValue, RawValue], logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'not between', range, logicalOperator);
+  }
+
+  /**
+   * Adds a not equals (!=) condition.
+   */
+  public notEquals(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '!=', value, logicalOperator);
+  }
+
+  /**
+   * Adds a NOT IN condition.
+   */
+  public notIn(field: string, values: RawValueArray, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, 'not in', values, logicalOperator);
+  }
+
+  /**
    * Configures which values should be skipped when adding conditions.
    * @param options Configuration for value skipping behavior
    * @returns The query builder instance for chaining
@@ -94,6 +262,19 @@ export class QueryBuilder {
   }
 
   /**
+   * Adds a strict equals (===) condition.
+   */
+  public strictEquals(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '===', value, logicalOperator);
+  }
+
+  /**
+   * Adds a strict not equals (!==) condition.
+   */
+  public strictNotEquals(field: string, value: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+    return this.where(field, '!==', value, logicalOperator);
+  }
+  /**
    * Serializes the query builder's conditions to a JSON-compatible structure.
    * @returns The serialized conditions array
    * @memberof QueryBuilder
@@ -107,8 +288,14 @@ export class QueryBuilder {
    * @returns A string representation of the query conditions
    * @memberof QueryBuilder
    */
-  public toString(): string {
-    return this.formatConditions(this.conditions);
+  /**
+   * Converts the query builder's conditions to a human-readable string representation.
+   * @param options Optional formatting options (arrayStyle: 'sql' | 'php')
+   * @returns A string representation of the query conditions
+   * @memberof QueryBuilder
+   */
+  public toString(options?: { arrayStyle?: ArrayStyle }): string {
+    return this.formatConditions(this.conditions, false, options?.arrayStyle || 'parens');
   }
 
   /**
@@ -121,7 +308,11 @@ export class QueryBuilder {
    * @memberof QueryBuilder
    */
   public where(field: string, operator: Operators, value?: RawValue, logicalOperator: LogicalOperator = 'and'): this {
-    if (this.shouldSkipValue(value)) {
+    // Don't skip values for null operators (they don't need values)
+    const nullOps: NullOperator[] = ['is null', 'is not null', 'is empty', 'is not empty'];
+    const isNullOperator = nullOps.includes(operator as NullOperator);
+
+    if (!isNullOperator && this.shouldSkipValue(value)) {
       return this;
     }
 
@@ -139,43 +330,60 @@ export class QueryBuilder {
    * @returns Formatted string representation of the conditions
    * @memberof QueryBuilder
    */
-  private formatConditions(conditions: QueryBuilderSerialized, isSubquery = false): string {
+  private formatConditions(
+    conditions: QueryBuilderSerialized,
+    isSubquery = false,
+    arrayStyle: ArrayStyle = 'parens'
+  ): string {
     const result: string[] = [];
-    let previousWasOperator = false;
 
     for (const cond of conditions) {
       if (typeof cond === 'string') {
-        if (!previousWasOperator) {
-          result.push(cond);
-        }
-        previousWasOperator = true;
+        // This is a logical operator (and/or)
+        result.push(cond);
       } else if ('group' in cond) {
-        const groupStr = this.formatConditions(cond.group, true);
+        const groupStr = this.formatConditions(cond.group, true, arrayStyle);
         if (groupStr) {
           result.push(`(${groupStr})`);
         }
-        previousWasOperator = false;
       } else {
-        if (result.length > 0 && !previousWasOperator) {
-          result.push('and');
-        }
-
         let conditionStr = `${cond.field} ${cond.operator}`;
 
-        if (cond.value !== undefined) {
+        // Handle null operators (no value needed)
+        const nullOps: NullOperator[] = ['is null', 'is not null', 'is empty', 'is not empty'];
+        const isNullOperator = nullOps.includes(cond.operator as NullOperator);
+
+        if (!isNullOperator && cond.value !== undefined) {
           if (Array.isArray(cond.value) && this.isConditionArray(cond.value)) {
-            conditionStr += ` ${this.formatConditions(cond.value, true)}`;
+            conditionStr += ` ${this.formatConditions(cond.value, true, arrayStyle)}`;
           } else if (Array.isArray(cond.value)) {
-            conditionStr += ` (${cond.value.map((v) => this.valueToString(v)).join(', ')})`;
+            // Handle 'between' and 'not between' with array values
+            const rangeOps: RangeOperator[] = ['between', 'not between'];
+            if (rangeOps.includes(cond.operator as RangeOperator)) {
+              conditionStr += ` ${cond.value
+                .flat()
+                .map((v) => this.valueToString(v, arrayStyle))
+                .join(' and ')}`;
+            } else {
+              // Use arrayStyle for array formatting
+              const arrStr = cond.value
+                .flat()
+                .map((v) => this.valueToString(v, arrayStyle))
+                .join(', ');
+              if (arrayStyle === 'brackets') {
+                conditionStr += ` [${arrStr}]`;
+              } else {
+                conditionStr += ` (${arrStr})`;
+              }
+            }
           } else {
-            conditionStr += ` ${this.valueToString(cond.value)}`;
+            conditionStr += ` ${this.valueToString(cond.value, arrayStyle)}`;
           }
-        } else {
+        } else if (!isNullOperator) {
           conditionStr += ` undefined`;
         }
 
         result.push(conditionStr);
-        previousWasOperator = false;
       }
     }
 
@@ -252,12 +460,13 @@ export class QueryBuilder {
    * @returns String representation of the value
    * @memberof QueryBuilder
    */
-  private valueToString(value: PrimitiveValue | RawValueArray): string {
+  private valueToString(value: PrimitiveValue | RawValueArray, arrayStyle: ArrayStyle = 'parens'): string {
     if (value === null) {
       return 'null';
     }
 
     if (value === undefined) {
+      /* istanbul ignore next */
       return 'undefined';
     }
 
@@ -269,11 +478,17 @@ export class QueryBuilder {
     }
 
     if (Array.isArray(value)) {
-      return value.map((v) => this.valueToString(v)).join(', ');
+      /* istanbul ignore next */
+      const arrStr = value
+        .flat()
+        .map((v) => this.valueToString(v, arrayStyle))
+        .join(', ');
+      /* istanbul ignore next */
+      return arrayStyle === 'brackets' ? `[${arrStr}]` : `(${arrStr})`;
     }
 
     if (typeof value === 'object' && value !== null && '$fn' in value) {
-      const args = value.args?.map((arg) => this.valueToString(arg)).join(', ') || '';
+      const args = value.args?.map((arg) => this.valueToString(arg, arrayStyle)).join(', ') || '';
       return `${value.$fn}(${args})`;
     }
 
