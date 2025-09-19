@@ -1,16 +1,30 @@
 # @andreasnicolaou/query-builder
 
-DEMO: https://stackblitz.com/edit/vitejs-vite-grxpgw5w
+A flexible, type-safe query builder for constructing complex conditional expressions with support for nested groups, various operators, and function calls.
 
-![GitHub package.json version](https://img.shields.io/github/package-json/v/andreasnicolaou/query-builder)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/andreasnicolaou/query-builder/build.yaml)
+![TypeScript](https://img.shields.io/badge/TS-TypeScript-3178c6?logo=typescript&logoColor=white)
+![GitHub contributors](https://img.shields.io/github/contributors/andreasnicolaou/query-builder)
 ![GitHub License](https://img.shields.io/github/license/andreasnicolaou/query-builder)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/andreasnicolaou/query-builder/build.yaml)
+![GitHub package.json version](https://img.shields.io/github/package-json/v/andreasnicolaou/query-builder)
+[![Known Vulnerabilities](https://snyk.io/test/github/andreasnicolaou/query-builder/badge.svg)](https://snyk.io/test/github/andreasnicolaou/query-builder)
+![Bundle Size](https://deno.bundlejs.com/badge?q=@andreasnicolaou/query-builder&treeshake=[*])
+
+![ESLint](https://img.shields.io/badge/linter-eslint-4B32C3.svg?logo=eslint)
+![Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?logo=prettier)
+![Jest](https://img.shields.io/badge/tested_with-jest-99424f.svg?logo=jest)
+![Maintenance](https://img.shields.io/maintenance/yes/2025)
+[![codecov](https://codecov.io/gh/andreasnicolaou/query-builder/graph/badge.svg?token=ND55MY6KTO)](https://codecov.io/gh/andreasnicolaou/query-builder)
 
 ![NPM Downloads](https://img.shields.io/npm/dm/%40andreasnicolaou%2Fquery-builder)
 
-A flexible, type-safe query builder for constructing complex conditional expressions with support for nested groups, various operators, and function calls.
-
 > **Note:** This is _not_ an ORM and does **not** execute queries or connect to any database. It's a serialization and expression-building utility, ideal for building advanced search/filter UIs, custom DSLs, or backend query engines.
+
+## Demo
+
+You can try this library live:
+
+👉 <a href="https://stackblitz.com/edit/vitejs-vite-grxpgw5w" target="_blank">Interactive Demo on StackBlitz</a>
 
 ## Features
 
@@ -214,36 +228,36 @@ function buildSearchQuery(formData: any) {
 }
 ```
 
-## API Highlights
+## API
 
 ### Core Methods
 
-| Method                                                | Description                                                                                                               |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `.where(field, operator, value?, logicalOperator?)`   | Add a condition with any operator                                                                                         |
-| `.group(callback, logicalOperator?)`                  | Create nested conditions (groups)                                                                                         |
-| `.skipWhen(options?)`                                 | Configure automatic value skipping (`null`, `undefined`, `''`, `[]`, `NaN` are skipped by default; empty objects are not) |
-| `.toJSON()`                                           | Get serializable representation                                                                                           |
-| `.toString(options?)`                                 | Get human-readable string (optionally control array style)                                                                |
-| `.between(field, range, logicalOperator?)`            | Add a `between` condition                                                                                                 |
-| `.notBetween(field, range, logicalOperator?)`         | Add a `not between` condition                                                                                             |
-| `.equals(field, value, logicalOperator?)`             | Add an equals (`=`) condition                                                                                             |
-| `.notEquals(field, value, logicalOperator?)`          | Add a not equals (`!=`) condition                                                                                         |
-| `.looseEquals(field, value, logicalOperator?)`        | Add a loose equals (`==`) condition                                                                                       |
-| `.strictEquals(field, value, logicalOperator?)`       | Add a strict equals (`===`) condition                                                                                     |
-| `.strictNotEquals(field, value, logicalOperator?)`    | Add a strict not equals (`!==`) condition                                                                                 |
-| `.greaterThan(field, value, logicalOperator?)`        | Add a greater than (`>`) condition                                                                                        |
-| `.greaterThanOrEqual(field, value, logicalOperator?)` | Add a greater than or equal (`>=`) condition                                                                              |
-| `.lessThan(field, value, logicalOperator?)`           | Add a less than (`<`) condition                                                                                           |
-| `.lessThanOrEqual(field, value, logicalOperator?)`    | Add a less than or equal (`<=`) condition                                                                                 |
-| `.like(field, value, logicalOperator?)`               | Add a `like` condition                                                                                                    |
-| `.ilike(field, value, logicalOperator?)`              | Add an `ilike` (case-insensitive like) condition                                                                          |
-| `.in(field, values, logicalOperator?)`                | Add an `in` condition                                                                                                     |
-| `.notIn(field, values, logicalOperator?)`             | Add a `not in` condition                                                                                                  |
-| `.isNull(field, logicalOperator?)`                    | Add an `is null` condition                                                                                                |
-| `.isNotNull(field, logicalOperator?)`                 | Add an `is not null` condition                                                                                            |
-| `.isEmpty(field, logicalOperator?)`                   | Add an `is empty` condition                                                                                               |
-| `.isNotEmpty(field, logicalOperator?)`                | Add an `is not empty` condition                                                                                           |
+| Method                                                | Description                                                                                               |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `.where(field, operator, value?, logicalOperator?)`   | Add a condition with any operator                                                                         |
+| `.group(callback, logicalOperator?)`                  | Create nested conditions (groups)                                                                         |
+| `.skipWhen(options?)`                                 | Configure automatic value skipping (`null`, `undefined`, `''`, `[]`, `NaN` , `{}` are skipped by default) |
+| `.toJSON()`                                           | Get serializable representation                                                                           |
+| `.toString(options?)`                                 | (optionally control array style)                                                                          |
+| `.between(field, range, logicalOperator?)`            | Add a `between` condition                                                                                 |
+| `.notBetween(field, range, logicalOperator?)`         | Add a `not between` condition                                                                             |
+| `.equals(field, value, logicalOperator?)`             | Add an equals (`=`) condition                                                                             |
+| `.notEquals(field, value, logicalOperator?)`          | Add a not equals (`!=`) condition                                                                         |
+| `.looseEquals(field, value, logicalOperator?)`        | Add a loose equals (`==`) condition                                                                       |
+| `.strictEquals(field, value, logicalOperator?)`       | Add a strict equals (`===`) condition                                                                     |
+| `.strictNotEquals(field, value, logicalOperator?)`    | Add a strict not equals (`!==`) condition                                                                 |
+| `.greaterThan(field, value, logicalOperator?)`        | Add a greater than (`>`) condition                                                                        |
+| `.greaterThanOrEqual(field, value, logicalOperator?)` | Add a greater than or equal (`>=`) condition                                                              |
+| `.lessThan(field, value, logicalOperator?)`           | Add a less than (`<`) condition                                                                           |
+| `.lessThanOrEqual(field, value, logicalOperator?)`    | Add a less than or equal (`<=`) condition                                                                 |
+| `.like(field, value, logicalOperator?)`               | Add a `like` condition                                                                                    |
+| `.ilike(field, value, logicalOperator?)`              | Add an `ilike` (case-insensitive like) condition                                                          |
+| `.in(field, values, logicalOperator?)`                | Add an `in` condition                                                                                     |
+| `.notIn(field, values, logicalOperator?)`             | Add a `not in` condition                                                                                  |
+| `.isNull(field, logicalOperator?)`                    | Add an `is null` condition                                                                                |
+| `.isNotNull(field, logicalOperator?)`                 | Add an `is not null` condition                                                                            |
+| `.isEmpty(field, logicalOperator?)`                   | Add an `is empty` condition                                                                               |
+| `.isNotEmpty(field, logicalOperator?)`                | Add an `is not empty` condition                                                                           |
 
 #### Static Helpers
 
