@@ -229,6 +229,41 @@ describe('QueryBuilder', () => {
       });
       expect(qb.toString()).toBe('(a == 1 and (b === 2 or c = 3))');
     });
+
+    test('should not mangle values containing double parentheses', () => {
+      qb.where('note', '=', '((hello))').where('label', 'like', '%((x))%');
+      expect(qb.toString()).toBe("note = '((hello))' and label like '%((x))%'");
+    });
+
+    test('should preserve double parentheses in values inside groups', () => {
+      qb.group((qb1) => {
+        qb1.where('note', '=', '((hello))').where('other', '=', 1);
+      });
+      expect(qb.toString()).toBe("(note = '((hello))' and other = 1)");
+    });
+
+    test('should handle sibling groups without collapsing parentheses', () => {
+      qb.group((qb1) => qb1.where('a', '=', 1)).group((qb2) => qb2.where('b', '=', 2), 'or');
+      expect(qb.toString()).toBe('(a = 1) or (b = 2)');
+    });
+
+    test('should handle a group whose only condition ends in a parenthesis', () => {
+      qb.group((qb1) => {
+        qb1.where('a', 'in', [1, 2]);
+      });
+      expect(qb.toString()).toBe('(a in (1, 2))');
+    });
+
+    test('should handle deeply nested groups', () => {
+      qb.group((qb1) => {
+        qb1.group((qb2) => {
+          qb2.group((qb3) => {
+            qb3.where('a', '=', 1);
+          });
+        });
+      });
+      expect(qb.toString()).toBe('(((a = 1)))');
+    });
   });
 
   describe('Others', () => {
@@ -390,6 +425,37 @@ describe('QueryBuilder', () => {
       qb.skipWhen({ emptyObject: true }).where('config', '=', {}).where('settings', '=', { darkMode: true });
       expect(qb.toString()).toBe('settings = {"darkMode":true}');
     });
+
+    test('should skip empty objects by default after partial skipWhen configuration', () => {
+      qb.skipWhen({ emptyString: true }).where('config', '=', {}).where('name', '=', 'Andreas');
+      expect(qb.toString()).toBe("name = 'Andreas'");
+    });
+
+    test('should skip null-prototype empty objects', () => {
+      qb.where('config', '=', Object.create(null)).where('name', '=', 'Andreas');
+      expect(qb.toString()).toBe("name = 'Andreas'");
+    });
+
+    test('should not skip Date values as empty objects', () => {
+      qb.where('created', '>', new Date('2025-01-01T00:00:00Z'));
+      expect(qb.toString()).toBe("created > '2025-01-01T00:00:00.000Z'");
+    });
+
+    test('should not skip Date values after skipWhen configuration', () => {
+      qb.skipWhen({ emptyObject: true }).where('created', '>', new Date('2025-01-01T00:00:00Z'));
+      expect(qb.toString()).toBe("created > '2025-01-01T00:00:00.000Z'");
+    });
+
+    test('should format Date values in ranges and sets like ISO strings', () => {
+      qb.where('created', 'between', [new Date('2025-01-01T00:00:00Z'), new Date('2025-12-31T00:00:00Z')]).where(
+        'day',
+        'in',
+        [new Date('2025-06-01T00:00:00Z')]
+      );
+      expect(qb.toString()).toBe(
+        "created between '2025-01-01T00:00:00.000Z' and '2025-12-31T00:00:00.000Z' and day in ('2025-06-01T00:00:00.000Z')"
+      );
+    });
   });
   describe('Like operators', () => {
     test('should handle like operator', () => {
@@ -447,6 +513,12 @@ describe('QueryBuilder', () => {
         .where('email', 'is not empty', undefined, 'and');
       expect(qb.toString()).toBe('deleted_at is null and active = true and email is not empty');
     });
+
+    test('should accept null as an explicit "no value" for null check operators', () => {
+      qb.where('deleted_at', 'is null', null).where('email', 'is not empty', null);
+      expect(qb.toString()).toBe('deleted_at is null and email is not empty');
+      expect(QueryBuilder.validateOperator('is not null', null)).toEqual({ valid: true });
+    });
   });
 
   describe('Complex UI scenarios', () => {
@@ -466,8 +538,7 @@ describe('QueryBuilder', () => {
     test('should handle date range search', () => {
       qb.where('created_at', 'between', ['2023-01-01T00:00:00Z', '2023-12-31T23:59:59Z']).where(
         'updated_at',
-        'is not null',
-        'and'
+        'is not null'
       );
 
       expect(qb.toString()).toBe(
@@ -515,6 +586,25 @@ describe('QueryBuilder', () => {
         valid: false,
         error: "Operator 'in' requires an array value",
       });
+    });
+
+    test('should reject logical operators as condition operators', () => {
+      expect(QueryBuilder.validateOperator('and' as never, true)).toEqual({
+        valid: false,
+        error: "Operator 'and' is not supported for conditions",
+      });
+
+      expect(() => qb.where('active', 'or' as never, true)).toThrow("Operator 'or' is not supported for conditions");
+    });
+
+    test('should throw when where receives invalid operator and value combinations', () => {
+      expect(() => qb.where('deleted_at', 'is null', 'unexpected')).toThrow(
+        "Operator 'is null' should not have a value"
+      );
+      expect(() => qb.where('age', 'between', [18])).toThrow(
+        "Operator 'between' requires an array with exactly 2 values"
+      );
+      expect(() => qb.where('role', 'in', 'admin')).toThrow("Operator 'in' requires an array value");
     });
   });
 });

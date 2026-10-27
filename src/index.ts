@@ -6,14 +6,10 @@ export type RangeOperator = 'between' | 'not between';
 export type NullOperator = 'is null' | 'is not null' | 'is empty' | 'is not empty';
 export type ArrayStyle = 'parens' | 'brackets';
 
-// Complete set of all possible operators
-export type Operators =
-  | WordOperator
-  | SetOperator
-  | LogicalOperator
-  | ComparisonOperator
-  | RangeOperator
-  | NullOperator;
+export type ConditionOperator = WordOperator | SetOperator | ComparisonOperator | RangeOperator | NullOperator;
+
+// Complete set of all possible operators, including logical connectors.
+export type Operators = ConditionOperator | LogicalOperator;
 
 export type PrimitiveValue = string | number | boolean | FunctionCall | null | object;
 export type RawValueArray = (PrimitiveValue | FunctionCall)[] | RawValueArray[];
@@ -28,7 +24,7 @@ export type QueryBuilderSerialized = (LogicalOperator | Condition | { group: Que
 
 export interface Condition {
   field: string;
-  operator: Operators;
+  operator: ConditionOperator;
   value?: RawValue;
 }
 
@@ -76,13 +72,42 @@ export class QueryBuilder {
    * @returns Validation result with error message if invalid
    * @memberof QueryBuilder
    */
-  public static validateOperator(operator: Operators, value?: RawValue): { valid: boolean; error?: string } {
+  public static validateOperator(operator: ConditionOperator, value?: RawValue): { valid: boolean; error?: string } {
     const nullOps: NullOperator[] = ['is null', 'is not null', 'is empty', 'is not empty'];
     const rangeOps: RangeOperator[] = ['between', 'not between'];
     const setOps: SetOperator[] = ['in', 'not in'];
+    const conditionOps: ConditionOperator[] = [
+      'starts with',
+      'ends with',
+      'contains',
+      'matches',
+      'like',
+      'ilike',
+      'not in',
+      'in',
+      '===',
+      '!==',
+      '==',
+      '=',
+      '!=',
+      '>=',
+      '<=',
+      '<',
+      '>',
+      'between',
+      'not between',
+      'is null',
+      'is not null',
+      'is empty',
+      'is not empty',
+    ];
 
-    // Null operators shouldn't have values
-    if (nullOps.includes(operator as NullOperator) && value !== undefined) {
+    if (!conditionOps.includes(operator)) {
+      return { valid: false, error: `Operator '${operator}' is not supported for conditions` };
+    }
+
+    // Null operators shouldn't have values (undefined or null are accepted as "no value")
+    if (nullOps.includes(operator as NullOperator) && value !== undefined && value !== null) {
       return { valid: false, error: `Operator '${operator}' should not have a value` };
     }
 
@@ -255,7 +280,7 @@ export class QueryBuilder {
       emptyString: true,
       emptyArray: true,
       nan: true,
-      emptyObject: false,
+      emptyObject: true,
       ...options,
     };
     return this;
@@ -285,12 +310,7 @@ export class QueryBuilder {
 
   /**
    * Converts the query builder's conditions to a human-readable string representation.
-   * @returns A string representation of the query conditions
-   * @memberof QueryBuilder
-   */
-  /**
-   * Converts the query builder's conditions to a human-readable string representation.
-   * @param options Optional formatting options (arrayStyle: 'sql' | 'php')
+   * @param options Optional formatting options (arrayStyle: 'parens' | 'brackets')
    * @returns A string representation of the query conditions
    * @memberof QueryBuilder
    */
@@ -307,13 +327,23 @@ export class QueryBuilder {
    * @returns The query builder instance for chaining
    * @memberof QueryBuilder
    */
-  public where(field: string, operator: Operators, value?: RawValue, logicalOperator: LogicalOperator = 'and'): this {
+  public where(
+    field: string,
+    operator: ConditionOperator,
+    value?: RawValue,
+    logicalOperator: LogicalOperator = 'and'
+  ): this {
     // Don't skip values for null operators (they don't need values)
     const nullOps: NullOperator[] = ['is null', 'is not null', 'is empty', 'is not empty'];
     const isNullOperator = nullOps.includes(operator as NullOperator);
 
     if (!isNullOperator && this.shouldSkipValue(value)) {
       return this;
+    }
+
+    const validation = QueryBuilder.validateOperator(operator, value);
+    if (!validation.valid) {
+      throw new Error(validation.error);
     }
 
     if (this.conditions.length > 0) {
@@ -342,7 +372,8 @@ export class QueryBuilder {
         // This is a logical operator (and/or)
         result.push(cond);
       } else if ('group' in cond) {
-        const groupStr = this.formatConditions(cond.group, true, arrayStyle);
+        // Format unwrapped, then wrap exactly once here.
+        const groupStr = this.formatConditions(cond.group, false, arrayStyle);
         if (groupStr) {
           result.push(`(${groupStr})`);
         }
@@ -387,8 +418,7 @@ export class QueryBuilder {
       }
     }
 
-    let finalString = result.join(' ');
-    finalString = finalString.replace(/\(\((.*?)\)\)/g, '($1)');
+    const finalString = result.join(' ');
     return isSubquery ? `(${finalString})` : finalString;
   }
 
@@ -402,6 +432,17 @@ export class QueryBuilder {
     return (
       Array.isArray(value) && value.some((item) => typeof item === 'object' && item !== null && 'operator' in item)
     );
+  }
+
+  /**
+   * Checks if a value is a plain object (created via {} or Object.create(null)).
+   * @param value The value to check
+   * @returns True if the value is a plain object, false otherwise
+   * @memberof QueryBuilder
+   */
+  private isPlainObject(value: object): boolean {
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
   }
 
   /**
@@ -445,6 +486,7 @@ export class QueryBuilder {
       value !== null &&
       !Array.isArray(value) &&
       !('$fn' in value) && // Don't skip FunctionCall objects
+      this.isPlainObject(value) && // Don't skip Date, RegExp or class instances
       Object.keys(value).length === 0 &&
       this.skipOptions.emptyObject
     ) {
@@ -475,6 +517,10 @@ export class QueryBuilder {
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
       return value.toString();
+    }
+
+    if (value instanceof Date) {
+      return `'${value.toISOString()}'`;
     }
 
     if (Array.isArray(value)) {

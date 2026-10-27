@@ -131,7 +131,7 @@ import { QueryBuilder } from '@andreasnicolaou/query-builder';
 const query = new QueryBuilder()
   .where('name', 'ilike', '%andreas%') // Case-insensitive search
   .where('age', 'between', [18, 65], 'and') // Age range
-  .where('email', 'is not null', undefined, 'and') // Email required
+  .isNotNull('email') // Email required
   .group((qb) => {
     qb.where('status', 'in', ['active', 'pending']).where('created', '>', new Date('2025-01-01').toISOString());
   })
@@ -183,9 +183,9 @@ const userQuery = new QueryBuilder()
   .skipWhen({ emptyString: true, null: false }) // Allow explicit nulls
   .where('email', 'is not null') // Email required
   .where('firstName', 'like', 'John%', 'and') // Starts with John
-  .where('lastName', 'is not empty', undefined, 'and') // Last name provided
+  .isNotEmpty('lastName') // Last name provided
   .where('age', 'between', [18, 99], 'and') // Adult users
-  .where('deletedAt', 'is null', undefined, 'and'); // Active users only
+  .isNull('deletedAt'); // Active users only
 
 // Result: email is not null and firstName like 'John%' and lastName is not empty and age between 18 and 99 and deletedAt is null
 ```
@@ -234,11 +234,11 @@ function buildSearchQuery(formData: any) {
 
 | Method                                                | Description                                                                                               |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `.where(field, operator, value?, logicalOperator?)`   | Add a condition with any operator                                                                         |
+| `.where(field, operator, value?, logicalOperator?)`   | Add a condition with any condition operator; invalid operator/value combinations throw                    |
 | `.group(callback, logicalOperator?)`                  | Create nested conditions (groups)                                                                         |
 | `.skipWhen(options?)`                                 | Configure automatic value skipping (`null`, `undefined`, `''`, `[]`, `NaN` , `{}` are skipped by default) |
 | `.toJSON()`                                           | Get serializable representation                                                                           |
-| `.toString(options?)`                                 | (optionally control array style)                                                                          |
+| `.toString(options?)`                                 | Optionally control array style with `{ arrayStyle: 'parens' }` or `{ arrayStyle: 'brackets' }`            |
 | `.between(field, range, logicalOperator?)`            | Add a `between` condition                                                                                 |
 | `.notBetween(field, range, logicalOperator?)`         | Add a `not between` condition                                                                             |
 | `.equals(field, value, logicalOperator?)`             | Add an equals (`=`) condition                                                                             |
@@ -261,10 +261,10 @@ function buildSearchQuery(formData: any) {
 
 #### Static Helpers
 
-| Method                                            | Description                                            |
-| ------------------------------------------------- | ------------------------------------------------------ |
-| `QueryBuilder.fn(name, ...args)`                  | Create function calls for values (e.g., `UPPER(name)`) |
-| `QueryBuilder.validateOperator(operator, value?)` | Validate if an operator is compatible with a value     |
+| Method                                            | Description                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `QueryBuilder.fn(name, ...args)`                  | Create function calls for values (e.g., `UPPER(name)`)                                           |
+| `QueryBuilder.validateOperator(operator, value?)` | Validate if a condition operator is compatible with a value; `.where()` uses the same validation |
 
 ## Supported Operators
 
